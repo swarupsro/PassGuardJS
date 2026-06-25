@@ -1,0 +1,67 @@
+{
+  "name": "passguardjs",
+  "version": "0.1.0",
+  "description": "A lightweight password strength and complexity validation library for JavaScript and TypeScript applications.",
+  "keywords": [
+    "password",
+    "password-strength",
+    "password-validation",
+    "security",
+    "typescript",
+    "authentication",
+    "forms"
+  ],
+  "homepage": "https://github.com/swarup/PassGuardJS#readme",
+  "bugs": {
+    "url": "https://github.com/swarup/PassGuardJS/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swarup/PassGuardJS.git"
+  },
+  "license": "MIT",
+  "author": "Swarup",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm run lint && npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.7",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  }
+}
