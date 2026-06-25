@@ -10,6 +10,9 @@ export type {
   PasswordRule,
   PasswordRuleContext,
   PasswordRuleResult,
+  PersonalInfo,
+  PersonalInfoInput,
+  PersonalInfoValue,
   ResolvedPasswordPolicy,
   StrengthLevel,
 } from './types';

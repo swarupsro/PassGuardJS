@@ -30,6 +30,19 @@ export interface PasswordRule {
   validate: (password: string, context: PasswordRuleContext) => PasswordRuleResult;
 }
 
+export type PersonalInfoValue = string | number | readonly (string | number)[];
+
+export interface PersonalInfo {
+  name?: PersonalInfoValue;
+  birthYear?: PersonalInfoValue;
+  email?: PersonalInfoValue;
+  username?: PersonalInfoValue;
+  phoneNumber?: PersonalInfoValue;
+  location?: PersonalInfoValue;
+}
+
+export type PersonalInfoInput = readonly (string | number)[] | PersonalInfo;
+
 export interface PasswordPolicy {
   minLength?: number;
   maxLength?: number;
@@ -43,6 +56,7 @@ export interface PasswordPolicy {
   blockKeyboardPatterns?: boolean;
   blockRepeatedCharacters?: boolean;
   blockSequentialCharacters?: boolean;
+  personalInfo?: PersonalInfoInput;
   userInputs?: readonly string[];
   commonPasswords?: readonly string[];
   keyboardPatterns?: readonly string[];
@@ -67,6 +81,7 @@ export interface ResolvedPasswordPolicy {
   blockKeyboardPatterns: boolean;
   blockRepeatedCharacters: boolean;
   blockSequentialCharacters: boolean;
+  personalInfo: readonly string[];
   userInputs: readonly string[];
   commonPasswords: readonly string[];
   keyboardPatterns: readonly string[];

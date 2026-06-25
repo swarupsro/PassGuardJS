@@ -51,6 +51,55 @@ describe('analyzePassword', () => {
     expect(result.issues.join(' ')).not.toContain('swarup@example.com');
   });
 
+  it('detects personalInfo array values such as names and birth years', () => {
+    const result = analyzePassword('Swarup@1995', {
+      personalInfo: ['Swarup', '1995'],
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.checks.userInputs?.passed).toBe(false);
+    expect(result.issues).toContain('Password contains personal information');
+  });
+
+  it('detects structured personalInfo fields for name, birth year, email, and username', () => {
+    const result = analyzePassword('Swarup.saha95!', {
+      personalInfo: {
+        name: 'Swarup Saha',
+        birthYear: 1995,
+        email: 'swarup.saha@example.com',
+        username: 'swarup_saha95',
+      },
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.checks.userInputs?.passed).toBe(false);
+    expect(result.checks.userInputs?.issue).toBe('Password contains personal information');
+  });
+
+  it('detects structured personalInfo fields for phone numbers and locations', () => {
+    const arrayPhoneResult = analyzePassword('Secure01712345678!', {
+      personalInfo: ['+880 1712-345678'],
+      userInputMinLength: 11,
+    });
+    const phoneResult = analyzePassword('Secure01712345678!', {
+      personalInfo: {
+        phoneNumber: '+880 1712-345678',
+      },
+    });
+    const locationResult = analyzePassword('Dhaka@2026Secure', {
+      personalInfo: {
+        location: ['Dhaka', 'Bangladesh'],
+      },
+    });
+
+    expect(arrayPhoneResult.isValid).toBe(false);
+    expect(arrayPhoneResult.checks.userInputs?.passed).toBe(false);
+    expect(phoneResult.isValid).toBe(false);
+    expect(phoneResult.checks.userInputs?.passed).toBe(false);
+    expect(locationResult.isValid).toBe(false);
+    expect(locationResult.checks.userInputs?.passed).toBe(false);
+  });
+
   it('detects keyboard patterns, repeated characters, and sequential characters', () => {
     const keyboard = analyzePassword('Qwerty-93!River');
     const repeated = analyzePassword('Aaaaaa-93!River');
