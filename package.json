@@ -1,6 +1,6 @@
 {
   "name": "passguardjs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A lightweight password strength and complexity validation library for JavaScript and TypeScript applications.",
   "keywords": [
     "password",
