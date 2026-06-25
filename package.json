@@ -5,22 +5,28 @@
   "keywords": [
     "password",
     "password-strength",
+    "password-validator",
     "password-validation",
+    "password-policy",
     "security",
-    "typescript",
     "authentication",
-    "forms"
+    "forms",
+    "typescript",
+    "javascript"
   ],
-  "homepage": "https://github.com/swarup/PassGuardJS#readme",
+  "homepage": "https://github.com/swarupsro/PassGuardJS#readme",
   "bugs": {
-    "url": "https://github.com/swarup/PassGuardJS/issues"
+    "url": "https://github.com/swarupsro/PassGuardJS/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/swarup/PassGuardJS.git"
+    "url": "git+https://github.com/swarupsro/PassGuardJS.git"
   },
   "license": "MIT",
-  "author": "Swarup",
+  "author": {
+    "name": "Swarup Saha",
+    "url": "https://github.com/swarupsro"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -63,5 +69,12 @@
   },
   "overrides": {
     "esbuild": "^0.28.1"
+  },
+  "directories": {
+    "example": "examples",
+    "test": "test"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
