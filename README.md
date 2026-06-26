@@ -33,13 +33,6 @@ and CommonJS builds.
 npm install passguardjs
 ```
 
-```bash
-pnpm add passguardjs
-```
-
-```bash
-yarn add passguardjs
-```
 
 ## Quick Start
 
