@@ -62,14 +62,14 @@ console.log(result);
 Personal information checks can use either a simple array or named fields:
 
 ```ts
-const arrayResult = analyzePassword('Swarup@1995', {
+const arrayResult = analyzePassword('Swarup@2000', {
   personalInfo: ['Swarup', '1995'],
 });
 
 const structuredResult = analyzePassword('Swarup.saha95!', {
   personalInfo: {
     name: 'Swarup Saha',
-    birthYear: 1995,
+    birthYear: 2000,
     email: 'swarup.saha@example.com',
     username: 'swarup_saha95',
     phoneNumber: '+8801712345678',
@@ -137,7 +137,7 @@ const policy: PasswordPolicy = {
   blockSequentialCharacters: true,
   personalInfo: {
     name: 'Alice Example',
-    birthYear: 1995,
+    birthYear: 2000,
     email: 'alice@example.com',
     username: 'alice95',
     phoneNumber: '+1 415 555 0135',
@@ -314,19 +314,6 @@ npm publish --access public
 
 The package publishes `dist/index.js` for ESM, `dist/index.cjs` for CommonJS, and
 `dist/index.d.ts` for TypeScript definitions.
-
-### GitHub Actions npm Publish
-
-This repository includes `.github/workflows/npm-publish.yml`. Add an npm automation token as the
-GitHub repository secret `NPM_TOKEN`, then push a new `package.json` version to `main`, publish a
-GitHub release, or run the workflow manually. The workflow skips publishing when that exact package
-version already exists on npm.
-
-## Naming Note
-
-For this repository, `PassGuardJS` and the npm package name `passguardjs` are more consistent than
-`PassShieldJS`. Other possible names are `PasswordSentinel`, `KeyGuard`, or `StrongPassKit`, but no
-availability check is implied.
 
 ## License
 
