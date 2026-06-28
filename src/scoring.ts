@@ -2,7 +2,7 @@ import type { CharacterStats, StrengthLevel } from './types';
 import { clamp } from './utils';
 
 export function calculateBaseScore(stats: CharacterStats): number {
-  const lengthScore = clamp(stats.length * 3, 0, 35);
+  const lengthScore = clamp(stats.length * 3, 0, 45);
   const varietyScore =
     (stats.hasLowercase ? 10 : 0) +
     (stats.hasUppercase ? 10 : 0) +

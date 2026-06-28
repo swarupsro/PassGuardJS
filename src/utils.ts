@@ -2,8 +2,22 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+const uniquePushSets = new WeakMap<string[], Set<string>>();
+
 export function uniquePush(target: string[], value: string | undefined): void {
-  if (value && !target.includes(value)) {
+  if (value === undefined || value.length === 0) {
+    return;
+  }
+
+  let seen = uniquePushSets.get(target);
+
+  if (seen === undefined || seen.size !== target.length) {
+    seen = new Set(target);
+    uniquePushSets.set(target, seen);
+  }
+
+  if (!seen.has(value)) {
+    seen.add(value);
     target.push(value);
   }
 }
@@ -60,6 +74,16 @@ export function normalizePositiveInteger(value: number | undefined, fallback: nu
     return fallback;
   }
 
+  const integer = Math.floor(value);
+
+  return integer > 0 ? integer : fallback;
+}
+
+export function normalizeNonNegativeInteger(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
   return Math.max(0, Math.floor(value));
 }
 
@@ -68,5 +92,7 @@ export function normalizeOptionalPositiveInteger(value: number | undefined): num
     return undefined;
   }
 
-  return Math.max(0, Math.floor(value));
+  const integer = Math.floor(value);
+
+  return integer > 0 ? integer : undefined;
 }

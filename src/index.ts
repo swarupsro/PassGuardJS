@@ -10,6 +10,7 @@ export type {
   PasswordRule,
   PasswordRuleContext,
   PasswordRuleResult,
+  PhoneCountryCodeAlias,
   PersonalInfo,
   PersonalInfoInput,
   PersonalInfoValue,

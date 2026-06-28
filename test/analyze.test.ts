@@ -32,11 +32,25 @@ describe('analyzePassword', () => {
       requireSpecialChar: true,
     });
 
-    expect(result.score).toBe(90);
+    expect(result.score).toBe(100);
     expect(result.strength).toBe('Very Strong');
     expect(result.isValid).toBe(true);
     expect(result.issues).toEqual([]);
     expect(result.suggestions).toEqual([]);
+  });
+
+  it('can award a full score to a long unique password with all character classes', () => {
+    const result = analyzePassword('Ab3!Cd4@Ef5#Gh6$', {
+      minScore: 100,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumber: true,
+      requireSpecialChar: true,
+    });
+
+    expect(result.score).toBe(100);
+    expect(result.strength).toBe('Very Strong');
+    expect(result.isValid).toBe(true);
   });
 
   it('detects personal information without echoing the personal token in the issue', () => {
@@ -98,6 +112,71 @@ describe('analyzePassword', () => {
     expect(phoneResult.checks.userInputs?.passed).toBe(false);
     expect(locationResult.isValid).toBe(false);
     expect(locationResult.checks.userInputs?.passed).toBe(false);
+  });
+
+  it('supports custom phone country aliases for national phone-number matching', () => {
+    const result = analyzePassword('Secure4155550135!', {
+      minScore: 0,
+      personalInfo: {
+        phoneNumber: '+1 415 555 0135',
+      },
+      phoneCountryCodeAliases: [{ countryCode: '1' }],
+      userInputMinLength: 10,
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.checks.userInputs?.passed).toBe(false);
+  });
+
+  it('does not extract standalone year-like digits from flat personalInfo values', () => {
+    const result = analyzePassword('secure2023!', {
+      minScore: 0,
+      personalInfo: ['john2023'],
+    });
+
+    expect(result.checks.userInputs?.passed).toBe(true);
+  });
+
+  it('detects short explicit personalInfo values', () => {
+    const result = analyzePassword('Jo2026secure!', {
+      minScore: 0,
+      personalInfo: {
+        name: 'Jo',
+      },
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.checks.userInputs?.passed).toBe(false);
+  });
+
+  it('detects shorter common passwords embedded in longer passwords', () => {
+    const result = analyzePassword('myadmin1', {
+      minScore: 0,
+    });
+
+    expect(result.checks.commonPassword?.passed).toBe(false);
+    expect(result.checks.commonPassword?.issue).toBe('Password contains a common password or word');
+  });
+
+  it('does not treat punctuation-only leet collisions as common passwords', () => {
+    const result = analyzePassword('!!!!!!', {
+      minLength: 6,
+      minScore: 0,
+      blockRepeatedCharacters: false,
+    });
+
+    expect(result.checks.commonPassword?.passed).toBe(true);
+  });
+
+  it('falls back to the default minimum length when minLength is zero', () => {
+    const result = analyzePassword('short', {
+      minLength: 0,
+      minScore: 0,
+      blockCommonPasswords: false,
+    });
+
+    expect(result.checks.minLength?.passed).toBe(false);
+    expect(result.checks.minLength?.metadata?.required).toBe(8);
   });
 
   it('detects keyboard patterns, repeated characters, and sequential characters', () => {

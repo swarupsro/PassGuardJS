@@ -3,14 +3,18 @@ import type {
   PasswordPolicy,
   PersonalInfoInput,
   PersonalInfoValue,
+  PhoneCountryCodeAlias,
   ResolvedPasswordPolicy,
 } from './types';
 import {
   clamp,
+  normalizeNonNegativeInteger,
   normalizeOptionalPositiveInteger,
   normalizePositiveInteger,
   uniquePush,
 } from './utils';
+
+const MIN_PHONE_DIGITS = 7;
 
 export const DEFAULT_POLICY: ResolvedPasswordPolicy = {
   minLength: 8,
@@ -25,6 +29,7 @@ export const DEFAULT_POLICY: ResolvedPasswordPolicy = {
   blockRepeatedCharacters: true,
   blockSequentialCharacters: true,
   personalInfo: [],
+  phoneCountryCodeAliases: [{ countryCode: '880', localPrefix: '0' }],
   userInputs: [],
   commonPasswords: COMMON_PASSWORDS,
   keyboardPatterns: KEYBOARD_PATTERNS,
@@ -42,12 +47,15 @@ export function definePasswordPolicy(policy: PasswordPolicy): PasswordPolicy {
 
 export function resolvePolicy(policy: PasswordPolicy = {}): ResolvedPasswordPolicy {
   const maxLength = normalizeOptionalPositiveInteger(policy.maxLength);
-  const personalInfo = collectPersonalInfo(policy.personalInfo);
+  const phoneCountryCodeAliases = collectPhoneCountryCodeAliases(
+    policy.phoneCountryCodeAliases ?? DEFAULT_POLICY.phoneCountryCodeAliases,
+  );
+  const personalInfo = collectPersonalInfo(policy.personalInfo, phoneCountryCodeAliases);
 
   return {
     minLength: normalizePositiveInteger(policy.minLength, DEFAULT_POLICY.minLength),
     ...(maxLength === undefined ? {} : { maxLength }),
-    minScore: clamp(normalizePositiveInteger(policy.minScore, DEFAULT_POLICY.minScore), 0, 100),
+    minScore: clamp(normalizeNonNegativeInteger(policy.minScore, DEFAULT_POLICY.minScore), 0, 100),
     requireUppercase: policy.requireUppercase ?? DEFAULT_POLICY.requireUppercase,
     requireLowercase: policy.requireLowercase ?? DEFAULT_POLICY.requireLowercase,
     requireNumber: policy.requireNumber ?? DEFAULT_POLICY.requireNumber,
@@ -60,9 +68,16 @@ export function resolvePolicy(policy: PasswordPolicy = {}): ResolvedPasswordPoli
     blockSequentialCharacters:
       policy.blockSequentialCharacters ?? DEFAULT_POLICY.blockSequentialCharacters,
     personalInfo,
+    phoneCountryCodeAliases,
     userInputs: collectUserInputs(policy.userInputs ?? DEFAULT_POLICY.userInputs, personalInfo),
-    commonPasswords: [...DEFAULT_POLICY.commonPasswords, ...(policy.commonPasswords ?? [])],
-    keyboardPatterns: [...DEFAULT_POLICY.keyboardPatterns, ...(policy.keyboardPatterns ?? [])],
+    commonPasswords:
+      policy.commonPasswords === undefined
+        ? DEFAULT_POLICY.commonPasswords
+        : [...DEFAULT_POLICY.commonPasswords, ...policy.commonPasswords],
+    keyboardPatterns:
+      policy.keyboardPatterns === undefined
+        ? DEFAULT_POLICY.keyboardPatterns
+        : [...DEFAULT_POLICY.keyboardPatterns, ...policy.keyboardPatterns],
     bannedSubstrings: [...(policy.bannedSubstrings ?? DEFAULT_POLICY.bannedSubstrings)],
     repeatedCharacterLimit: Math.max(
       2,
@@ -87,7 +102,10 @@ export function resolvePolicy(policy: PasswordPolicy = {}): ResolvedPasswordPoli
   };
 }
 
-function collectPersonalInfo(personalInfo: PasswordPolicy['personalInfo']): string[] {
+function collectPersonalInfo(
+  personalInfo: PasswordPolicy['personalInfo'],
+  phoneCountryCodeAliases: readonly PhoneCountryCodeAlias[],
+): string[] {
   const values: string[] = [];
 
   if (personalInfo === undefined) {
@@ -95,7 +113,7 @@ function collectPersonalInfo(personalInfo: PasswordPolicy['personalInfo']): stri
   }
 
   if (isPersonalInfoList(personalInfo)) {
-    addPhoneNumberValue(values, personalInfo);
+    addPhoneNumberValue(values, personalInfo, phoneCountryCodeAliases, true);
     return values;
   }
 
@@ -103,8 +121,33 @@ function collectPersonalInfo(personalInfo: PasswordPolicy['personalInfo']): stri
   addPersonalInfoValue(values, personalInfo.birthYear);
   addPersonalInfoValue(values, personalInfo.email);
   addPersonalInfoValue(values, personalInfo.username);
-  addPhoneNumberValue(values, personalInfo.phoneNumber);
+  addPhoneNumberValue(values, personalInfo.phoneNumber, phoneCountryCodeAliases, false);
   addPersonalInfoValue(values, personalInfo.location);
+
+  return values;
+}
+
+function collectPhoneCountryCodeAliases(
+  aliases: readonly PhoneCountryCodeAlias[],
+): PhoneCountryCodeAlias[] {
+  const values: PhoneCountryCodeAlias[] = [];
+  const seen = new Set<string>();
+
+  for (const alias of aliases) {
+    const countryCode = digitsOnly(alias.countryCode);
+    const localPrefix = alias.localPrefix === undefined ? undefined : digitsOnly(alias.localPrefix);
+
+    if (countryCode.length === 0) {
+      continue;
+    }
+
+    const key = `${countryCode}:${localPrefix ?? ''}`;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      values.push(localPrefix === undefined ? { countryCode } : { countryCode, localPrefix });
+    }
+  }
 
   return values;
 }
@@ -146,45 +189,79 @@ function addPersonalInfoPrimitive(target: string[], value: string | number): voi
   uniquePush(target, String(value));
 }
 
-function addPhoneNumberValue(target: string[], value: PersonalInfoValue | undefined): void {
+function addPhoneNumberValue(
+  target: string[],
+  value: PersonalInfoValue | undefined,
+  phoneCountryCodeAliases: readonly PhoneCountryCodeAlias[],
+  requirePhoneLikeValue: boolean,
+): void {
   if (value === undefined) {
     return;
   }
 
   if (isPersonalInfoValueList(value)) {
     for (const item of value) {
-      addPhoneNumberPrimitive(target, item);
+      addPhoneNumberPrimitive(target, item, phoneCountryCodeAliases, requirePhoneLikeValue);
     }
 
     return;
   }
 
-  addPhoneNumberPrimitive(target, value);
+  addPhoneNumberPrimitive(target, value, phoneCountryCodeAliases, requirePhoneLikeValue);
 }
 
-function addPhoneNumberPrimitive(target: string[], value: string | number): void {
+function addPhoneNumberPrimitive(
+  target: string[],
+  value: string | number,
+  phoneCountryCodeAliases: readonly PhoneCountryCodeAlias[],
+  requirePhoneLikeValue: boolean,
+): void {
   addPersonalInfoPrimitive(target, value);
 
-  const digits = String(value).replace(/\D/g, '');
+  const rawValue = String(value);
+  const digits = digitsOnly(rawValue);
 
-  if (digits.length === 0) {
+  if (
+    digits.length < MIN_PHONE_DIGITS ||
+    (requirePhoneLikeValue && !looksLikePhoneNumber(rawValue, digits))
+  ) {
     return;
   }
 
-  uniquePush(target, digits);
+  const digitForms: string[] = [];
+  uniquePush(digitForms, digits);
 
   if (digits.startsWith('00') && digits.length > 2) {
-    uniquePush(target, digits.slice(2));
+    uniquePush(digitForms, digits.slice(2));
   }
 
-  if (digits.startsWith('880') && digits.length > 3) {
-    uniquePush(target, `0${digits.slice(3)}`);
-    uniquePush(target, digits.slice(3));
-  }
+  for (const digitForm of digitForms) {
+    uniquePush(target, digitForm);
 
-  if (digits.startsWith('0') && digits.length > 1) {
-    uniquePush(target, digits.slice(1));
+    for (const alias of phoneCountryCodeAliases) {
+      if (digitForm.startsWith(alias.countryCode) && digitForm.length > alias.countryCode.length) {
+        const nationalNumber = digitForm.slice(alias.countryCode.length);
+
+        if (alias.localPrefix !== undefined) {
+          uniquePush(target, `${alias.localPrefix}${nationalNumber}`);
+        }
+
+        uniquePush(target, nationalNumber);
+      }
+    }
+
+    if (digitForm.startsWith('0') && !digitForm.startsWith('00') && digitForm.length > 1) {
+      uniquePush(target, digitForm.slice(1));
+    }
   }
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function looksLikePhoneNumber(rawValue: string, digits: string): boolean {
+  return digits.length >= 10 || /^\s*(?:\+|00)/.test(rawValue) || /[\s().-]/.test(rawValue);
 }
 
 function isPersonalInfoList(value: PersonalInfoInput): value is readonly (string | number)[] {

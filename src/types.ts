@@ -43,6 +43,11 @@ export interface PersonalInfo {
 
 export type PersonalInfoInput = readonly (string | number)[] | PersonalInfo;
 
+export interface PhoneCountryCodeAlias {
+  countryCode: string;
+  localPrefix?: string;
+}
+
 export interface PasswordPolicy {
   minLength?: number;
   maxLength?: number;
@@ -57,6 +62,7 @@ export interface PasswordPolicy {
   blockRepeatedCharacters?: boolean;
   blockSequentialCharacters?: boolean;
   personalInfo?: PersonalInfoInput;
+  phoneCountryCodeAliases?: readonly PhoneCountryCodeAlias[];
   userInputs?: readonly string[];
   commonPasswords?: readonly string[];
   keyboardPatterns?: readonly string[];
@@ -82,6 +88,7 @@ export interface ResolvedPasswordPolicy {
   blockRepeatedCharacters: boolean;
   blockSequentialCharacters: boolean;
   personalInfo: readonly string[];
+  phoneCountryCodeAliases: readonly PhoneCountryCodeAlias[];
   userInputs: readonly string[];
   commonPasswords: readonly string[];
   keyboardPatterns: readonly string[];

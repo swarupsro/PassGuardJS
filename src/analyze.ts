@@ -17,6 +17,8 @@ import type {
 } from './types';
 import { compactAlphanumeric, normalizeForComparison, toLeetComparable, uniquePush } from './utils';
 
+const PERSONAL_INFO_MIN_LENGTH = 2;
+
 export function analyzePassword(
   password: string,
   policy: PasswordPolicy = {},
@@ -132,11 +134,9 @@ export function analyzePassword(
   }
 
   if (resolvedPolicy.blockUserInputs && resolvedPolicy.userInputs.length > 0) {
-    const hasUserInput = containsUserInput(
-      password,
-      resolvedPolicy.userInputs,
-      resolvedPolicy.userInputMinLength,
-    );
+    const hasUserInput =
+      containsUserInput(password, resolvedPolicy.userInputs, resolvedPolicy.userInputMinLength) ||
+      containsShortPersonalInfo(password, resolvedPolicy);
 
     addCheck('userInputs', {
       passed: !hasUserInput,
@@ -228,4 +228,27 @@ export function analyzePassword(
     suggestions,
     checks,
   };
+}
+
+function containsShortPersonalInfo(
+  password: string,
+  policy: ReturnType<typeof resolvePolicy>,
+): boolean {
+  if (policy.userInputMinLength <= PERSONAL_INFO_MIN_LENGTH || policy.personalInfo.length === 0) {
+    return false;
+  }
+
+  const shortPersonalInfo = policy.personalInfo.filter((value) => {
+    const compactValue = compactAlphanumeric(value);
+
+    return (
+      compactValue.length >= PERSONAL_INFO_MIN_LENGTH &&
+      compactValue.length < policy.userInputMinLength
+    );
+  });
+
+  return (
+    shortPersonalInfo.length > 0 &&
+    containsUserInput(password, shortPersonalInfo, PERSONAL_INFO_MIN_LENGTH)
+  );
 }

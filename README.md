@@ -33,7 +33,6 @@ and CommonJS builds.
 npm install passguardjs
 ```
 
-
 ## Quick Start
 
 ```ts
@@ -136,6 +135,7 @@ const policy: PasswordPolicy = {
     phoneNumber: '+1 415 555 0135',
     location: ['San Francisco', 'California'],
   },
+  phoneCountryCodeAliases: [{ countryCode: '1' }],
   userInputs: ['alice', 'alice@example.com'],
 };
 
@@ -160,30 +160,31 @@ to `minScore`.
 
 ### Policy Options
 
-| Option                      | Type                | Default     | Description                                                                                  |
-| --------------------------- | ------------------- | ----------- | -------------------------------------------------------------------------------------------- |
-| `minLength`                 | `number`            | `8`         | Minimum password length.                                                                     |
-| `maxLength`                 | `number`            | `undefined` | Optional maximum password length.                                                            |
-| `minScore`                  | `number`            | `60`        | Minimum score required for `isValid`.                                                        |
-| `requireUppercase`          | `boolean`           | `false`     | Require at least one uppercase ASCII letter.                                                 |
-| `requireLowercase`          | `boolean`           | `false`     | Require at least one lowercase ASCII letter.                                                 |
-| `requireNumber`             | `boolean`           | `false`     | Require at least one number.                                                                 |
-| `requireSpecialChar`        | `boolean`           | `false`     | Require at least one non-alphanumeric character.                                             |
-| `blockCommonPasswords`      | `boolean`           | `true`      | Block built-in and custom common passwords.                                                  |
-| `blockUserInputs`           | `boolean`           | `true`      | Block passwords containing personal input tokens.                                            |
-| `blockKeyboardPatterns`     | `boolean`           | `true`      | Block keyboard walks such as `qwerty` and `asdf`.                                            |
-| `blockRepeatedCharacters`   | `boolean`           | `true`      | Block repeated runs such as `aaaaaa`.                                                        |
-| `blockSequentialCharacters` | `boolean`           | `true`      | Block sequential runs such as `abcdef` and `123456`.                                         |
-| `personalInfo`              | `PersonalInfoInput` | `[]`        | Names, birth years, emails, usernames, phone numbers, and locations to block from passwords. |
-| `userInputs`                | `string[]`          | `[]`        | Generic personal inputs such as phone numbers or custom identifiers.                         |
-| `commonPasswords`           | `string[]`          | `[]`        | Extra common passwords to block in addition to the built-in list.                            |
-| `keyboardPatterns`          | `string[]`          | `[]`        | Extra keyboard-like patterns to block.                                                       |
-| `bannedSubstrings`          | `string[]`          | `[]`        | Organization-specific words or phrases to block.                                             |
-| `repeatedCharacterLimit`    | `number`            | `3`         | Consecutive repeated characters allowed before blocking.                                     |
-| `sequenceLength`            | `number`            | `4`         | Sequential run length allowed before blocking.                                               |
-| `keyboardPatternLength`     | `number`            | `4`         | Keyboard pattern length allowed before blocking.                                             |
-| `userInputMinLength`        | `number`            | `3`         | Minimum personal token length to compare.                                                    |
-| `customRules`               | `PasswordRule[]`    | `[]`        | Add organization-specific validators.                                                        |
+| Option                      | Type                      | Default                         | Description                                                                                  |
+| --------------------------- | ------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `minLength`                 | `number`                  | `8`                             | Minimum password length.                                                                     |
+| `maxLength`                 | `number`                  | `undefined`                     | Optional maximum password length.                                                            |
+| `minScore`                  | `number`                  | `60`                            | Minimum score required for `isValid`.                                                        |
+| `requireUppercase`          | `boolean`                 | `false`                         | Require at least one uppercase ASCII letter.                                                 |
+| `requireLowercase`          | `boolean`                 | `false`                         | Require at least one lowercase ASCII letter.                                                 |
+| `requireNumber`             | `boolean`                 | `false`                         | Require at least one number.                                                                 |
+| `requireSpecialChar`        | `boolean`                 | `false`                         | Require at least one non-alphanumeric character.                                             |
+| `blockCommonPasswords`      | `boolean`                 | `true`                          | Block built-in and custom common passwords.                                                  |
+| `blockUserInputs`           | `boolean`                 | `true`                          | Block passwords containing personal input tokens.                                            |
+| `blockKeyboardPatterns`     | `boolean`                 | `true`                          | Block keyboard walks such as `qwerty` and `asdf`.                                            |
+| `blockRepeatedCharacters`   | `boolean`                 | `true`                          | Block repeated runs such as `aaaaaa`.                                                        |
+| `blockSequentialCharacters` | `boolean`                 | `true`                          | Block sequential runs such as `abcdef` and `123456`.                                         |
+| `personalInfo`              | `PersonalInfoInput`       | `[]`                            | Names, birth years, emails, usernames, phone numbers, and locations to block from passwords. |
+| `phoneCountryCodeAliases`   | `PhoneCountryCodeAlias[]` | Bangladesh `880` with local `0` | Country-code aliases used when normalizing phone numbers.                                    |
+| `userInputs`                | `string[]`                | `[]`                            | Generic personal inputs such as phone numbers or custom identifiers.                         |
+| `commonPasswords`           | `string[]`                | `[]`                            | Extra common passwords to block in addition to the built-in list.                            |
+| `keyboardPatterns`          | `string[]`                | `[]`                            | Extra keyboard-like patterns to block.                                                       |
+| `bannedSubstrings`          | `string[]`                | `[]`                            | Organization-specific words or phrases to block.                                             |
+| `repeatedCharacterLimit`    | `number`                  | `3`                             | Consecutive repeated characters allowed before blocking.                                     |
+| `sequenceLength`            | `number`                  | `4`                             | Sequential run length allowed before blocking.                                               |
+| `keyboardPatternLength`     | `number`                  | `4`                             | Keyboard pattern length allowed before blocking.                                             |
+| `userInputMinLength`        | `number`                  | `3`                             | Minimum personal token length to compare.                                                    |
+| `customRules`               | `PasswordRule[]`          | `[]`                            | Add organization-specific validators.                                                        |
 
 ## Strength Levels
 

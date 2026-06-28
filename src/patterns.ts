@@ -13,6 +13,15 @@ interface CommonPasswordMatch {
   exact: boolean;
 }
 
+interface CommonPasswordItem {
+  compact: string;
+  leet: string;
+  canUseLeet: boolean;
+}
+
+const COMMON_PASSWORD_SUBSTRING_MIN_LENGTH = 4;
+const commonPasswordCache = new WeakMap<readonly string[], CommonPasswordItem[]>();
+
 export function getCharacterStats(password: string): CharacterStats {
   const characters = Array.from(password);
 
@@ -32,25 +41,30 @@ export function containsCommonPassword(
 ): CommonPasswordMatch {
   const compactPassword = compactAlphanumeric(password);
   const leetPassword = toLeetComparable(password);
-  const commonItems = uniqueNormalizedList(commonPasswords).map((commonPassword) => ({
-    compact: compactAlphanumeric(commonPassword),
-    leet: toLeetComparable(commonPassword),
-  }));
+  const commonItems = getCommonPasswordItems(commonPasswords);
 
   for (const commonPassword of commonItems) {
     if (commonPassword.compact.length === 0) {
       continue;
     }
 
-    if (compactPassword === commonPassword.compact || leetPassword === commonPassword.leet) {
+    if (
+      compactPassword === commonPassword.compact ||
+      (compactPassword.length > 0 &&
+        commonPassword.canUseLeet &&
+        leetPassword === commonPassword.leet)
+    ) {
       return { found: true, exact: true };
     }
   }
 
   for (const commonPassword of commonItems) {
     if (
-      commonPassword.compact.length >= 6 &&
-      (compactPassword.includes(commonPassword.compact) ||
+      (commonPassword.compact.length >= COMMON_PASSWORD_SUBSTRING_MIN_LENGTH &&
+        compactPassword.includes(commonPassword.compact)) ||
+      (compactPassword.length > 0 &&
+        commonPassword.canUseLeet &&
+        commonPassword.leet.length >= COMMON_PASSWORD_SUBSTRING_MIN_LENGTH &&
         leetPassword.includes(commonPassword.leet))
     ) {
       return { found: true, exact: false };
@@ -80,7 +94,7 @@ export function containsKeyboardPattern(
         for (let index = 0; index <= direction.length - length; index += 1) {
           const candidate = direction.slice(index, index + length);
 
-          if (candidate.length >= minLength && compactPassword.includes(candidate)) {
+          if (compactPassword.includes(candidate)) {
             return true;
           }
         }
@@ -160,13 +174,42 @@ export function containsUserInput(
   for (const token of tokens) {
     const compactToken = compactAlphanumeric(token);
     const leetToken = toLeetComparable(token);
+    const canUseLeet = hasAsciiLetter(compactToken);
 
-    if (compactPassword.includes(compactToken) || leetPassword.includes(leetToken)) {
+    if (
+      compactPassword.includes(compactToken) ||
+      (canUseLeet &&
+        (compactPassword.includes(leetToken) ||
+          leetPassword.includes(compactToken) ||
+          leetPassword.includes(leetToken)))
+    ) {
       return true;
     }
   }
 
   return false;
+}
+
+function getCommonPasswordItems(commonPasswords: readonly string[]): CommonPasswordItem[] {
+  const cached = commonPasswordCache.get(commonPasswords);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const items = uniqueNormalizedList(commonPasswords).map((commonPassword) => ({
+    compact: compactAlphanumeric(commonPassword),
+    leet: toLeetComparable(commonPassword),
+    canUseLeet: hasAsciiLetter(compactAlphanumeric(commonPassword)),
+  }));
+
+  commonPasswordCache.set(commonPasswords, items);
+
+  return items;
+}
+
+function hasAsciiLetter(value: string): boolean {
+  return /[a-z]/.test(value);
 }
 
 export function containsBannedSubstring(
