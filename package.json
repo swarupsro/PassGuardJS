@@ -1,6 +1,6 @@
 {
   "name": "passguardjs",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "A lightweight password strength and complexity validation library for JavaScript and TypeScript applications.",
   "keywords": [
     "password",
@@ -8,6 +8,13 @@
     "password-validator",
     "password-validation",
     "password-policy",
+    "password-generator",
+    "passphrase",
+    "entropy",
+    "zxcvbn-alternative",
+    "have-i-been-pwned",
+    "nist-800-63b",
+    "owasp",
     "security",
     "authentication",
     "forms",
@@ -32,12 +39,20 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "unpkg": "./dist/passguard.min.global.js",
+  "jsdelivr": "./dist/passguard.min.global.js",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -45,9 +60,11 @@
     "LICENSE"
   ],
   "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",

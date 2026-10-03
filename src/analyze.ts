@@ -1,3 +1,4 @@
+import { estimateEntropy } from './entropy';
 import {
   containsBannedSubstring,
   containsCommonPassword,
@@ -8,26 +9,38 @@ import {
   hasSequentialCharacters,
 } from './patterns';
 import { resolvePolicy } from './policy';
-import { applyPenalties, calculateBaseScore, strengthFromScore } from './scoring';
+import { applyPenalties, calculateBaseScore, entropyCap, strengthFromScore } from './scoring';
 import type {
   AnalyzePasswordResult,
   PasswordCheckResult,
   PasswordPolicy,
   PasswordRuleContext,
+  ResolvedPasswordPolicy,
 } from './types';
 import { compactAlphanumeric, normalizeForComparison, toLeetComparable, uniquePush } from './utils';
 
 const PERSONAL_INFO_MIN_LENGTH = 2;
+const MAX_PATTERN_SAMPLE_LENGTH = 4096;
 
 export function analyzePassword(
   password: string,
   policy: PasswordPolicy = {},
 ): AnalyzePasswordResult {
+  return analyzeWithResolvedPolicy(password, resolvePolicy(policy));
+}
+
+export function analyzeWithResolvedPolicy(
+  password: string,
+  resolvedPolicy: ResolvedPasswordPolicy,
+): AnalyzePasswordResult {
   if (typeof password !== 'string') {
     throw new TypeError('PassGuardJS expected password to be a string.');
   }
 
-  const resolvedPolicy = resolvePolicy(policy);
+  const sample =
+    password.length > MAX_PATTERN_SAMPLE_LENGTH
+      ? password.slice(0, MAX_PATTERN_SAMPLE_LENGTH)
+      : password;
   const stats = getCharacterStats(password);
   const issues: string[] = [];
   const suggestions: string[] = [];
@@ -35,7 +48,15 @@ export function analyzePassword(
   const checks: Record<string, PasswordCheckResult> = {};
 
   const addCheck = (id: string, result: PasswordCheckResult): void => {
-    checks[id] = result;
+    let key = id;
+    let suffix = 2;
+
+    while (Object.prototype.hasOwnProperty.call(checks, key)) {
+      key = `${id}#${suffix}`;
+      suffix += 1;
+    }
+
+    checks[key] = result;
 
     if (!result.passed) {
       uniquePush(issues, result.issue);
@@ -118,7 +139,7 @@ export function analyzePassword(
   });
 
   if (resolvedPolicy.blockCommonPasswords) {
-    const commonPasswordMatch = containsCommonPassword(password, resolvedPolicy.commonPasswords);
+    const commonPasswordMatch = containsCommonPassword(sample, resolvedPolicy.commonPasswords);
 
     addCheck('commonPassword', {
       passed: !commonPasswordMatch.found,
@@ -135,8 +156,8 @@ export function analyzePassword(
 
   if (resolvedPolicy.blockUserInputs && resolvedPolicy.userInputs.length > 0) {
     const hasUserInput =
-      containsUserInput(password, resolvedPolicy.userInputs, resolvedPolicy.userInputMinLength) ||
-      containsShortPersonalInfo(password, resolvedPolicy);
+      containsUserInput(sample, resolvedPolicy.userInputs, resolvedPolicy.userInputMinLength) ||
+      containsShortPersonalInfo(sample, resolvedPolicy);
 
     addCheck('userInputs', {
       passed: !hasUserInput,
@@ -148,7 +169,7 @@ export function analyzePassword(
 
   if (resolvedPolicy.blockKeyboardPatterns) {
     const hasKeyboardPattern = containsKeyboardPattern(
-      password,
+      sample,
       resolvedPolicy.keyboardPatterns,
       resolvedPolicy.keyboardPatternLength,
     );
@@ -162,7 +183,7 @@ export function analyzePassword(
   }
 
   if (resolvedPolicy.blockRepeatedCharacters) {
-    const hasRepeats = hasRepeatedCharacters(password, resolvedPolicy.repeatedCharacterLimit);
+    const hasRepeats = hasRepeatedCharacters(sample, resolvedPolicy.repeatedCharacterLimit);
 
     addCheck('repeatedCharacters', {
       passed: !hasRepeats,
@@ -173,7 +194,7 @@ export function analyzePassword(
   }
 
   if (resolvedPolicy.blockSequentialCharacters) {
-    const hasSequence = hasSequentialCharacters(password, resolvedPolicy.sequenceLength);
+    const hasSequence = hasSequentialCharacters(sample, resolvedPolicy.sequenceLength);
 
     addCheck('sequentialCharacters', {
       passed: !hasSequence,
@@ -184,7 +205,7 @@ export function analyzePassword(
   }
 
   if (resolvedPolicy.bannedSubstrings.length > 0) {
-    const hasBannedSubstring = containsBannedSubstring(password, resolvedPolicy.bannedSubstrings);
+    const hasBannedSubstring = containsBannedSubstring(sample, resolvedPolicy.bannedSubstrings);
 
     addCheck('bannedSubstrings', {
       passed: !hasBannedSubstring,
@@ -196,18 +217,20 @@ export function analyzePassword(
 
   if (resolvedPolicy.customRules.length > 0) {
     const context: PasswordRuleContext = {
-      compactPassword: compactAlphanumeric(password),
-      leetNormalizedPassword: toLeetComparable(password),
-      normalizedPassword: normalizeForComparison(password),
+      compactPassword: compactAlphanumeric(sample),
+      leetNormalizedPassword: toLeetComparable(sample),
+      normalizedPassword: normalizeForComparison(sample),
       policy: resolvedPolicy,
     };
 
     for (const rule of resolvedPolicy.customRules) {
-      addCheck(`custom:${rule.id}`, rule.validate(password, context));
+      addCheck(`custom:${rule.id}`, runCustomRule(rule, password, context));
     }
   }
 
-  const score = applyPenalties(calculateBaseScore(stats), penalties);
+  const { entropyBits, crackTimes } = estimateEntropy(password);
+  const rawScore = applyPenalties(calculateBaseScore(stats), penalties);
+  const score = Math.min(rawScore, entropyCap(entropyBits));
   const strength = strengthFromScore(score);
 
   addCheck('minScore', {
@@ -224,16 +247,44 @@ export function analyzePassword(
     score,
     strength,
     isValid: Object.values(checks).every((check) => check.passed),
+    entropyBits,
+    crackTimes,
     issues,
     suggestions,
     checks,
   };
 }
 
-function containsShortPersonalInfo(
+function runCustomRule(
+  rule: ResolvedPasswordPolicy['customRules'][number],
   password: string,
-  policy: ReturnType<typeof resolvePolicy>,
-): boolean {
+  context: PasswordRuleContext,
+): PasswordCheckResult {
+  let result: PasswordCheckResult;
+
+  try {
+    result = rule.validate(password, context);
+  } catch {
+    return {
+      passed: false,
+      issue: 'Password could not be verified against a custom rule',
+      suggestion: 'Try a different password',
+      penalty: 0,
+    };
+  }
+
+  if (result.passed) {
+    return result;
+  }
+
+  return {
+    ...result,
+    issue: result.issue ?? 'Password does not meet a custom requirement',
+    suggestion: result.suggestion ?? 'Choose a different password',
+  };
+}
+
+function containsShortPersonalInfo(password: string, policy: ResolvedPasswordPolicy): boolean {
   if (policy.userInputMinLength <= PERSONAL_INFO_MIN_LENGTH || policy.personalInfo.length === 0) {
     return false;
   }

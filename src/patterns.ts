@@ -19,7 +19,8 @@ interface CommonPasswordItem {
   canUseLeet: boolean;
 }
 
-const COMMON_PASSWORD_SUBSTRING_MIN_LENGTH = 4;
+const COMMON_PASSWORD_SUBSTRING_MIN_LENGTH = 5;
+const KEYBOARD_ANYWHERE_MIN_LENGTH = 5;
 const commonPasswordCache = new WeakMap<readonly string[], CommonPasswordItem[]>();
 
 export function getCharacterStats(password: string): CharacterStats {
@@ -28,10 +29,10 @@ export function getCharacterStats(password: string): CharacterStats {
   return {
     length: characters.length,
     uniqueCharacters: new Set(characters).size,
-    hasUppercase: /[A-Z]/.test(password),
-    hasLowercase: /[a-z]/.test(password),
-    hasNumber: /[0-9]/.test(password),
-    hasSpecialChar: /[^A-Za-z0-9]/.test(password),
+    hasUppercase: /\p{Lu}/u.test(password),
+    hasLowercase: /\p{Ll}/u.test(password),
+    hasNumber: /\p{Nd}/u.test(password),
+    hasSpecialChar: /[^\p{L}\p{N}\p{M}]/u.test(password),
   };
 }
 
@@ -91,7 +92,9 @@ export function containsKeyboardPattern(
 
     for (const direction of directions) {
       for (let length = direction.length; length >= minLength; length -= 1) {
-        for (let index = 0; index <= direction.length - length; index += 1) {
+        const lastIndex = length < KEYBOARD_ANYWHERE_MIN_LENGTH ? 0 : direction.length - length;
+
+        for (let index = 0; index <= lastIndex; index += 1) {
           const candidate = direction.slice(index, index + length);
 
           if (compactPassword.includes(candidate)) {

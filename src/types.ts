@@ -100,10 +100,24 @@ export interface ResolvedPasswordPolicy {
   customRules: readonly PasswordRule[];
 }
 
+export interface CrackTime {
+  seconds: number;
+  display: string;
+}
+
+export interface CrackTimes {
+  onlineThrottled: CrackTime;
+  onlineUnthrottled: CrackTime;
+  offlineSlowHash: CrackTime;
+  offlineFastHash: CrackTime;
+}
+
 export interface AnalyzePasswordResult {
   score: number;
   strength: StrengthLevel;
   isValid: boolean;
+  entropyBits: number;
+  crackTimes: CrackTimes;
   issues: string[];
   suggestions: string[];
   checks: Record<string, PasswordCheckResult>;

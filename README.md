@@ -25,7 +25,15 @@ and CommonJS builds.
 - Uppercase, lowercase, number, and special character requirements
 - Custom policy configuration and custom validation rules
 - Detailed validation result with issues, suggestions, and per-rule checks
-- Works with Vanilla JS, React, Vue, Angular, Node.js, and other JavaScript runtimes
+- Entropy estimate and crack-time estimates (online, offline slow hash, offline fast hash)
+- Secure password and passphrase generators backed by `crypto.getRandomValues`
+- Optional Have I Been Pwned breach check using k-anonymity (only a 5-character hash prefix is sent)
+- Ready-made policy presets: `NIST_800_63B`, `OWASP_ASVS`, `STRICT`
+- `createAnalyzer(policy)` to resolve a policy once and reuse it on every keystroke
+- Unicode-aware character classes and homoglyph (Cyrillic/Greek look-alike) normalization
+- Fails closed: throwing custom rules and malformed policies never crash validation
+- Works with Vanilla JS, React, Vue, Angular, Node.js, Deno, Bun, and edge runtimes
+- Zero runtime dependencies, with a `<script>` bundle for plain HTML pages
 
 ## Installation
 
@@ -142,6 +150,72 @@ const policy: PasswordPolicy = {
 const result = analyzePassword('Violet-Moon-73!Quartz', policy);
 ```
 
+### `createAnalyzer(policy?)`
+
+Resolves the policy once. Use it for live feedback as the user types.
+
+```ts
+import { createAnalyzer, OWASP_ASVS } from 'passguardjs';
+
+const analyzer = createAnalyzer({ ...OWASP_ASVS, userInputs: ['alice@example.com'] });
+
+analyzer.analyze('hunter2'); // sync result
+analyzer.isValid('R7!vQ2#zL9$pT4@xM6'); // boolean
+await analyzer.analyzeAsync('R7!vQ2#zL9$pT4@xM6', { breach: true });
+```
+
+### `generatePassword(options?)` and `generatePassphrase(options?)`
+
+```ts
+import { generatePassword, generatePassphrase } from 'passguardjs';
+
+generatePassword({ length: 20 }); // 'k#7Qv-2mXr!Td9@Wp4Zs'
+generatePassword({ length: 16, symbols: false, excludeAmbiguous: true });
+generatePassphrase({ words: 5, separator: '-', includeNumber: true }); // 'Polar-Meadow-Echo42-Pillow-Elbow'
+```
+
+Both use rejection sampling over `crypto.getRandomValues` (no modulo bias) and throw if no secure
+random source exists. Password options: `length`, `lowercase`, `uppercase`, `numbers`, `symbols`,
+`excludeAmbiguous`, `exclude`. Passphrase options: `words`, `separator`, `capitalize`,
+`includeNumber`, `wordList` (at least 128 unique words).
+
+### Breach check (Have I Been Pwned)
+
+```ts
+import { analyzePasswordAsync, checkBreachedPassword } from 'passguardjs';
+
+const { breached, count } = await checkBreachedPassword('password123');
+
+const result = await analyzePasswordAsync('password123', { minLength: 12 }, { breach: true });
+result.breachCount; // number, or null when the check was not run
+```
+
+Only the first 5 characters of the SHA-1 hash leave the device, and the request uses the
+`Add-Padding` header. If the lookup fails, validation succeeds by default; set
+`failOnBreachCheckError: true` to fail closed. Pass `breach: { fetch, endpoint, signal }` to use a
+custom fetch or a self-hosted mirror.
+
+### Policy presets
+
+```ts
+import { analyzePassword, NIST_800_63B, OWASP_ASVS, STRICT } from 'passguardjs';
+
+analyzePassword('correct-horse-9-staple-quartz', NIST_800_63B);
+```
+
+- `NIST_800_63B`: no composition rules, blocks common/contextual/patterned passwords.
+- `OWASP_ASVS`: 12 to 128 characters, no composition rules.
+- `STRICT`: 14+ characters, all character classes, `minScore: 75`.
+
+### Browser `<script>` tag
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/passguardjs"></script>
+<script>
+  console.log(PassGuard.analyzePassword('Tr0ub4dor&3').strength);
+</script>
+```
+
 ### Result Shape
 
 ```ts
@@ -149,6 +223,13 @@ interface AnalyzePasswordResult {
   score: number;
   strength: 'Very Weak' | 'Weak' | 'Medium' | 'Strong' | 'Very Strong';
   isValid: boolean;
+  entropyBits: number;
+  crackTimes: {
+    onlineThrottled: { seconds: number; display: string };
+    onlineUnthrottled: { seconds: number; display: string };
+    offlineSlowHash: { seconds: number; display: string };
+    offlineFastHash: { seconds: number; display: string };
+  };
   issues: string[];
   suggestions: string[];
   checks: Record<string, PasswordCheckResult>;
@@ -156,7 +237,8 @@ interface AnalyzePasswordResult {
 ```
 
 `isValid` is `true` only when all enabled checks pass and the final score is greater than or equal
-to `minScore`.
+to `minScore`. The score is capped by the entropy estimate, so a long but low-entropy password
+cannot reach a high score. Entropy and crack times are heuristic estimates, not guarantees.
 
 ### Policy Options
 
@@ -165,9 +247,9 @@ to `minScore`.
 | `minLength`                 | `number`                  | `8`                             | Minimum password length.                                                                     |
 | `maxLength`                 | `number`                  | `undefined`                     | Optional maximum password length.                                                            |
 | `minScore`                  | `number`                  | `60`                            | Minimum score required for `isValid`.                                                        |
-| `requireUppercase`          | `boolean`                 | `false`                         | Require at least one uppercase ASCII letter.                                                 |
-| `requireLowercase`          | `boolean`                 | `false`                         | Require at least one lowercase ASCII letter.                                                 |
-| `requireNumber`             | `boolean`                 | `false`                         | Require at least one number.                                                                 |
+| `requireUppercase`          | `boolean`                 | `false`                         | Require at least one uppercase letter (any script).                                          |
+| `requireLowercase`          | `boolean`                 | `false`                         | Require at least one lowercase letter (any script).                                          |
+| `requireNumber`             | `boolean`                 | `false`                         | Require at least one decimal digit (any script).                                             |
 | `requireSpecialChar`        | `boolean`                 | `false`                         | Require at least one non-alphanumeric character.                                             |
 | `blockCommonPasswords`      | `boolean`                 | `true`                          | Block built-in and custom common passwords.                                                  |
 | `blockUserInputs`           | `boolean`                 | `true`                          | Block passwords containing personal input tokens.                                            |
@@ -180,9 +262,9 @@ to `minScore`.
 | `commonPasswords`           | `string[]`                | `[]`                            | Extra common passwords to block in addition to the built-in list.                            |
 | `keyboardPatterns`          | `string[]`                | `[]`                            | Extra keyboard-like patterns to block.                                                       |
 | `bannedSubstrings`          | `string[]`                | `[]`                            | Organization-specific words or phrases to block.                                             |
-| `repeatedCharacterLimit`    | `number`                  | `3`                             | Consecutive repeated characters allowed before blocking.                                     |
-| `sequenceLength`            | `number`                  | `4`                             | Sequential run length allowed before blocking.                                               |
-| `keyboardPatternLength`     | `number`                  | `4`                             | Keyboard pattern length allowed before blocking.                                             |
+| `repeatedCharacterLimit`    | `number`                  | `3`                             | A run of this many identical characters is blocked (`aaa` fails at `3`). Minimum `2`.        |
+| `sequenceLength`            | `number`                  | `4`                             | A sequential run of this length is blocked (`abcd` fails at `4`). Minimum `3`.               |
+| `keyboardPatternLength`     | `number`                  | `4`                             | Keyboard walks of this length are blocked at the start of a row; 5+ anywhere. Minimum `3`.   |
 | `userInputMinLength`        | `number`                  | `3`                             | Minimum personal token length to compare.                                                    |
 | `customRules`               | `PasswordRule[]`          | `[]`                            | Add organization-specific validators.                                                        |
 
@@ -301,13 +383,11 @@ npm run build
 
 ## Publishing
 
-```bash
-npm version patch
-npm publish --access public
-```
+Bump the version in `package.json` and push to `main`. The GitHub Actions workflow lints,
+typechecks, tests, builds, and publishes to npm with provenance when the version is new.
 
-The package publishes `dist/index.js` for ESM, `dist/index.cjs` for CommonJS, and
-`dist/index.d.ts` for TypeScript definitions.
+The package ships `dist/index.js` (ESM), `dist/index.cjs` (CommonJS), matching `.d.ts` / `.d.cts`
+types, and `dist/passguard.min.global.js` (browser global `PassGuard`).
 
 ## License
 

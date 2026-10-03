@@ -1,6 +1,8 @@
 import type { CharacterStats, StrengthLevel } from './types';
 import { clamp } from './utils';
 
+const ENTROPY_FOR_FULL_SCORE = 64;
+
 export function calculateBaseScore(stats: CharacterStats): number {
   const lengthScore = clamp(stats.length * 3, 0, 45);
   const varietyScore =
@@ -15,13 +17,20 @@ export function calculateBaseScore(stats: CharacterStats): number {
 }
 
 export function applyPenalties(score: number, penalties: readonly number[]): number {
-  const totalPenalty = penalties.reduce((total, penalty) => total + Math.max(0, penalty), 0);
+  const totalPenalty = penalties.reduce(
+    (total, penalty) => total + (Number.isFinite(penalty) ? Math.max(0, penalty) : 0),
+    0,
+  );
 
   return clamp(Math.round(score - totalPenalty), 0, 100);
 }
 
+export function entropyCap(entropyBits: number): number {
+  return clamp(Math.round((entropyBits / ENTROPY_FOR_FULL_SCORE) * 100), 0, 100);
+}
+
 export function strengthFromScore(score: number): StrengthLevel {
-  if (score < 20) {
+  if (!Number.isFinite(score) || score < 20) {
     return 'Very Weak';
   }
 

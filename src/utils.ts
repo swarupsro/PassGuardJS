@@ -22,12 +22,58 @@ export function uniquePush(target: string[], value: string | undefined): void {
   }
 }
 
+const CONFUSABLES: Readonly<Record<string, string>> = {
+  а: 'a',
+  в: 'b',
+  е: 'e',
+  к: 'k',
+  м: 'm',
+  н: 'h',
+  о: 'o',
+  р: 'p',
+  с: 'c',
+  т: 't',
+  у: 'y',
+  х: 'x',
+  і: 'i',
+  ј: 'j',
+  ѕ: 's',
+  α: 'a',
+  ο: 'o',
+  ρ: 'p',
+  ν: 'v',
+  ι: 'i',
+  κ: 'k',
+  τ: 't',
+  υ: 'u',
+  χ: 'x',
+};
+
+const LEET_REPLACEMENTS: Readonly<Record<string, string>> = {
+  '!': 'i',
+  '|': 'i',
+  '@': 'a',
+  $: 's',
+  '+': 't',
+  '(': 'c',
+  '0': 'o',
+  '1': 'i',
+  '3': 'e',
+  '4': 'a',
+  '5': 's',
+  '7': 't',
+  '8': 'b',
+  '9': 'g',
+};
+
 export function normalizeForComparison(value: string): string {
-  return value
+  const folded = value
     .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
     .trim()
     .toLowerCase();
+
+  return Array.from(folded, (char) => CONFUSABLES[char] ?? char).join('');
 }
 
 export function compactAlphanumeric(value: string): string {
@@ -35,22 +81,7 @@ export function compactAlphanumeric(value: string): string {
 }
 
 export function toLeetComparable(value: string): string {
-  const replacements: Record<string, string> = {
-    '!': 'i',
-    '|': 'i',
-    '@': 'a',
-    $: 's',
-    '+': 't',
-    '0': 'o',
-    '1': 'i',
-    '3': 'e',
-    '4': 'a',
-    '5': 's',
-    '7': 't',
-    '8': 'b',
-  };
-
-  return Array.from(normalizeForComparison(value), (char) => replacements[char] ?? char)
+  return Array.from(normalizeForComparison(value), (char) => LEET_REPLACEMENTS[char] ?? char)
     .join('')
     .replace(/[^a-z0-9]/g, '');
 }
@@ -59,6 +90,10 @@ export function uniqueNormalizedList(values: readonly string[]): string[] {
   const normalized = new Set<string>();
 
   for (const value of values) {
+    if (typeof value !== 'string') {
+      continue;
+    }
+
     const item = normalizeForComparison(value);
 
     if (item.length > 0) {

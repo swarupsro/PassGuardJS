@@ -16,7 +16,27 @@ import {
 
 const MIN_PHONE_DIGITS = 7;
 
-export const DEFAULT_POLICY: ResolvedPasswordPolicy = {
+const mergedListCache = new WeakMap<readonly string[], WeakMap<readonly string[], string[]>>();
+
+function mergeLists(base: readonly string[], extra: readonly string[]): readonly string[] {
+  let byExtra = mergedListCache.get(base);
+
+  if (byExtra === undefined) {
+    byExtra = new WeakMap();
+    mergedListCache.set(base, byExtra);
+  }
+
+  let merged = byExtra.get(extra);
+
+  if (merged === undefined) {
+    merged = [...base, ...extra.filter((item) => typeof item === 'string')];
+    byExtra.set(extra, merged);
+  }
+
+  return merged;
+}
+
+export const DEFAULT_POLICY: ResolvedPasswordPolicy = Object.freeze({
   minLength: 8,
   minScore: 60,
   requireUppercase: false,
@@ -39,7 +59,7 @@ export const DEFAULT_POLICY: ResolvedPasswordPolicy = {
   keyboardPatternLength: 4,
   userInputMinLength: 3,
   customRules: [],
-};
+});
 
 export function definePasswordPolicy(policy: PasswordPolicy): PasswordPolicy {
   return policy;
@@ -73,12 +93,14 @@ export function resolvePolicy(policy: PasswordPolicy = {}): ResolvedPasswordPoli
     commonPasswords:
       policy.commonPasswords === undefined
         ? DEFAULT_POLICY.commonPasswords
-        : [...DEFAULT_POLICY.commonPasswords, ...policy.commonPasswords],
+        : mergeLists(DEFAULT_POLICY.commonPasswords, policy.commonPasswords),
     keyboardPatterns:
       policy.keyboardPatterns === undefined
         ? DEFAULT_POLICY.keyboardPatterns
-        : [...DEFAULT_POLICY.keyboardPatterns, ...policy.keyboardPatterns],
-    bannedSubstrings: [...(policy.bannedSubstrings ?? DEFAULT_POLICY.bannedSubstrings)],
+        : mergeLists(DEFAULT_POLICY.keyboardPatterns, policy.keyboardPatterns),
+    bannedSubstrings: (policy.bannedSubstrings ?? DEFAULT_POLICY.bannedSubstrings).filter(
+      (item) => typeof item === 'string',
+    ),
     repeatedCharacterLimit: Math.max(
       2,
       normalizePositiveInteger(
@@ -134,8 +156,13 @@ function collectPhoneCountryCodeAliases(
   const seen = new Set<string>();
 
   for (const alias of aliases) {
-    const countryCode = digitsOnly(alias.countryCode);
-    const localPrefix = alias.localPrefix === undefined ? undefined : digitsOnly(alias.localPrefix);
+    if (alias === null || typeof alias !== 'object') {
+      continue;
+    }
+
+    const countryCode = digitsOnly(String(alias.countryCode ?? ''));
+    const localPrefix =
+      alias.localPrefix === undefined ? undefined : digitsOnly(String(alias.localPrefix));
 
     if (countryCode.length === 0) {
       continue;
@@ -159,7 +186,9 @@ function collectUserInputs(
   const values: string[] = [];
 
   for (const input of userInputs) {
-    uniquePush(values, input);
+    if (typeof input === 'string') {
+      uniquePush(values, input);
+    }
   }
 
   for (const input of personalInfo) {
@@ -186,6 +215,10 @@ function addPersonalInfoValue(target: string[], value: PersonalInfoValue | undef
 }
 
 function addPersonalInfoPrimitive(target: string[], value: string | number): void {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return;
+  }
+
   uniquePush(target, String(value));
 }
 
@@ -216,6 +249,10 @@ function addPhoneNumberPrimitive(
   phoneCountryCodeAliases: readonly PhoneCountryCodeAlias[],
   requirePhoneLikeValue: boolean,
 ): void {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return;
+  }
+
   addPersonalInfoPrimitive(target, value);
 
   const rawValue = String(value);
