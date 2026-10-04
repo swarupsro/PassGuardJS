@@ -6,3 +6,11 @@ coverage
 .env
 .env.*
 !.env.example
+
+# AI assistant and tooling state
+.commandcode/
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.aider*
