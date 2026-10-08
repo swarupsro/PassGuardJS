@@ -44,7 +44,7 @@ export function estimateEntropyBits(password: string): number {
 }
 
 export function estimateCrackTimes(entropyBits: number): CrackTimes {
-  const averageGuesses = Math.pow(2, Math.max(0, entropyBits)) / 2;
+  const averageGuesses = entropyBits <= 0 ? 0 : Math.pow(2, entropyBits) / 2;
 
   const toCrackTime = (rate: number): CrackTime => {
     const seconds = averageGuesses / rate;

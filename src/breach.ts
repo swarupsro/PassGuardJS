@@ -62,7 +62,7 @@ export async function checkBreachedPassword(
   for (const line of (await response.text()).split(/\r?\n/)) {
     const [candidate, rawCount] = line.trim().split(':');
 
-    if (candidate === suffix) {
+    if (candidate?.toUpperCase() === suffix) {
       const count = Number.parseInt(rawCount ?? '0', 10);
 
       return { breached: count > 0, count: Number.isFinite(count) ? count : 0 };

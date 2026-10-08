@@ -2,15 +2,20 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_POLICY,
   NIST_800_63B,
+  OWASP_ASVS,
+  PRESETS,
   STRICT,
   analyzePassword,
   analyzePasswordAsync,
   checkBreachedPassword,
   createAnalyzer,
+  estimateCrackTimes,
   estimateEntropy,
   formatDuration,
   generatePassphrase,
   generatePassword,
+  passphraseEntropyBits,
+  resolvePolicy,
   strengthFromScore,
 } from '../src';
 
@@ -174,6 +179,21 @@ describe('entropy', () => {
     expect(formatDuration(90)).toBe('2 minutes');
     expect(formatDuration(Infinity)).toBe('centuries');
   });
+
+  it('estimates crack times accurately including zero entropy', () => {
+    const zeroCrack = estimateCrackTimes(0);
+    expect(zeroCrack.onlineThrottled.display).toBe('instantly');
+    expect(zeroCrack.onlineThrottled.seconds).toBe(0);
+    expect(zeroCrack.offlineFastHash.display).toBe('instantly');
+
+    const highCrack = estimateCrackTimes(100);
+    expect(highCrack.offlineFastHash.display).toBe('centuries');
+  });
+
+  it('calculates passphrase entropy bits', () => {
+    expect(passphraseEntropyBits(5)).toBeGreaterThan(30);
+    expect(passphraseEntropyBits(0)).toBe(0);
+  });
 });
 
 describe('generators', () => {
@@ -223,6 +243,26 @@ describe('generators', () => {
     expect(passphrase.split('-')).toHaveLength(5);
     expect(passphrase).toMatch(/[0-9]/);
     expect(() => generatePassphrase({ words: 1 })).toThrow(RangeError);
+  });
+
+  it('respects exclude character list in generatePassword', () => {
+    const password = generatePassword({ length: 50, exclude: 'abcABC123!@#' });
+    for (const char of 'abcABC123!@#') {
+      expect(password).not.toContain(char);
+    }
+  });
+
+  it('supports custom passphrase word list, separator, and capitalize: false', () => {
+    const customList = Array.from({ length: 130 }, (_, i) => `word${i}`);
+    const passphrase = generatePassphrase({
+      words: 4,
+      separator: '_',
+      capitalize: false,
+      wordList: customList,
+    });
+    const parts = passphrase.split('_');
+    expect(parts).toHaveLength(4);
+    expect(parts[0]).toMatch(/^word\d+$/);
   });
 });
 
@@ -293,6 +333,31 @@ describe('breach check', () => {
 
     expect(open.isValid).toBe(true);
   });
+
+  it('matches lowercase hash candidates from API responses', async () => {
+    const result = await checkBreachedPassword('password', {
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => '1e4c9b93f3f0682250b6cf8331b7ee68fd8:42\r\n',
+      }),
+    });
+
+    expect(result).toEqual({ breached: true, count: 42 });
+  });
+
+  it('supports padding: false', async () => {
+    let sentHeaders: Record<string, string> | undefined;
+    await checkBreachedPassword('x', {
+      padding: false,
+      fetch: async (_url, init) => {
+        sentHeaders = init?.headers;
+        return { ok: true, status: 200, text: async () => '' };
+      },
+    });
+
+    expect(sentHeaders?.['Add-Padding']).toBeUndefined();
+  });
 });
 
 describe('analyzer and presets', () => {
@@ -307,5 +372,25 @@ describe('analyzer and presets', () => {
   it('NIST preset has no composition requirements', () => {
     expect(NIST_800_63B.requireUppercase).toBe(false);
     expect(analyzePassword('correct-horse-9-staple-quartz', NIST_800_63B).isValid).toBe(true);
+  });
+
+  it('resolves policy defaults and normalizes parameters', () => {
+    const resolved = resolvePolicy({
+      minLength: 16,
+      minScore: 120,
+      repeatedCharacterLimit: 1,
+    });
+
+    expect(resolved.minLength).toBe(16);
+    expect(resolved.minScore).toBe(100);
+    expect(resolved.repeatedCharacterLimit).toBe(2);
+  });
+
+  it('exports OWASP_ASVS and PRESETS', () => {
+    expect(PRESETS.owasp).toBe(OWASP_ASVS);
+    expect(PRESETS.nist).toBe(NIST_800_63B);
+    expect(PRESETS.strict).toBe(STRICT);
+    expect(OWASP_ASVS.minLength).toBe(12);
+    expect(OWASP_ASVS.maxLength).toBe(128);
   });
 });

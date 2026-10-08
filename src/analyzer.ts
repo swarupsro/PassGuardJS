@@ -1,6 +1,7 @@
 import { analyzeWithResolvedPolicy } from './analyze';
 import { checkBreachedPassword, type BreachCheckOptions } from './breach';
 import { resolvePolicy } from './policy';
+import { uniquePush } from './utils';
 import type {
   AnalyzePasswordResult,
   PasswordCheckResult,
@@ -63,8 +64,8 @@ export function createAnalyzer(policy: PasswordPolicy = {}): PasswordAnalyzer {
 
       if (result.breached) {
         isValid = false;
-        issues.push('Password has appeared in a known data breach');
-        suggestions.push('Choose a password that has never been exposed in a breach');
+        uniquePush(issues, 'Password has appeared in a known data breach');
+        uniquePush(suggestions, 'Choose a password that has never been exposed in a breach');
       }
     } catch {
       if (options.failOnBreachCheckError === true) {
@@ -74,8 +75,8 @@ export function createAnalyzer(policy: PasswordPolicy = {}): PasswordAnalyzer {
           issue: 'Password could not be checked against known breaches',
           suggestion: 'Try again later',
         };
-        issues.push('Password could not be checked against known breaches');
-        suggestions.push('Try again later');
+        uniquePush(issues, 'Password could not be checked against known breaches');
+        uniquePush(suggestions, 'Try again later');
       }
     }
 
